@@ -1,5 +1,5 @@
 {
-  description = "A flake for the Yosys synthesis suite";
+  description = "A nix flake for the Yosys synthesis suite";
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
