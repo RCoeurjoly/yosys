@@ -66,10 +66,10 @@ jobs:
         shell: bash
         run: |
           make config-clang
-          make -j${{ env.procs }} CXXSTD=${{ matrix.cpp_std }} CC=cc CXX=cc LD=cc
+          make -j${{ env.procs }} CXXSTD=${{ matrix.cpp_std }}
 
       - name: Run tests
         if: matrix.cpp_std == 'c++11'
         shell: bash
         run: |
-          make -j${{ env.procs }} test CXXSTD=${{ matrix.cpp_std }} CC=cc CXX=cc LD=cc
+          make -j${{ env.procs }} test CXXSTD=${{ matrix.cpp_std }}
