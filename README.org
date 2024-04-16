@@ -1,0 +1,5 @@
+
+* How to build
+#+begin_src shell :shebang #!/bin/bash -i :results output
+nix build .?submodules=1
+#+end_src
