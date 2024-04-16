@@ -21,7 +21,7 @@
           name = "yosys";
           pname = "yosys";
           version = "0.35";
-          src = ./yosys;
+          src = ./.;
           buildInputs = with pkgs; [ clang bison flex libffi tcl readline python3 llvmPackages.libcxxClang zlib git ];
           checkInputs = with pkgs; [ gtest ];
           # propagatedBuildInputs = with pkgs; [ abc-verifier ];
