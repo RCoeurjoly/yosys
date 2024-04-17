@@ -33,10 +33,10 @@ struct CppScope {
 		for(const char **p = reserved_keywords; *p != nullptr; p++)
 			reserve(*p);
 	}
-	void reserve(std::string name) {
+	void reserve(const std::string& name) {
 		used_names.insert(name);
 	}
-	std::string insert(IdString id) {
+	std::string insert(const IdString& id) {
 		std::string str = RTLIL::unescape_id(id);
 		for(size_t i = 0; i < str.size(); i++)
 			if(strchr("!\"#%&'()*+,-./:;<=>?@[]\\^`{|}~ ", str[i]))
@@ -56,7 +56,7 @@ struct CppScope {
 			}
 		}
 	}
-	std::string operator[](IdString id) {
+	std::string operator[](const IdString& id) {
 		if(name_map.count(id) > 0)
 			return name_map[id];
 		else
