@@ -1,4 +1,8 @@
 #include <array>
+#include <cstddef>
+#include <cstdint>
+#include <cassert>
+#include <cstdio>
 
 template<size_t n>
 using Signal = std::array<bool, n>;
