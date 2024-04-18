@@ -23,6 +23,8 @@
 #include "kernel/functional.h"
 #include "kernel/graphtools.h"
 
+#include <cassert>
+
 USING_YOSYS_NAMESPACE
 PRIVATE_NAMESPACE_BEGIN
 
