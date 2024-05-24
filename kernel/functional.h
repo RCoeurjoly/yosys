@@ -59,6 +59,7 @@ private:
     dict<int, SparseAttr> sparse_attrs;
 
 public:
+  const std::vector<Node>& get_nodes() const { return nodes; }
     template<typename Graph>
     struct BaseRef
     {

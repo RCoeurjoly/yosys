@@ -49,3 +49,4 @@ OBJS += passes/cmds/xprop.o
 OBJS += passes/cmds/dft_tag.o
 OBJS += passes/cmds/future.o
 OBJS += passes/cmds/example_dt.o
+OBJS += passes/cmds/netlist_to_compute_graph.o
