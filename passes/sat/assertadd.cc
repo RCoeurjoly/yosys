@@ -43,6 +43,7 @@ struct AssertaddWorker
 	AssertaddWorker(Module *module, bool flag_noinit = false, bool flag_always = false) :
 			module(module), sigmap(module), flag_noinit(flag_noinit), flag_always(flag_always)
 	{
+	  return;
 		for (auto wire : module->wires())
 		{
 			if (wire->port_output)
@@ -144,38 +145,10 @@ struct AssertaddWorker
 		return sigspec_actsignals.at(sig);
 	}
 
-	void run(Cell *pmux)
+	void run(Cell *add)
 	{
-		log("Adding assert for $pmux cell %s.%s.\n", log_id(module), log_id(pmux));
-
-		int swidth = pmux->getParam(ID::S_WIDTH).as_int();
-		int cntbits = ceil_log2(swidth+1);
-
-		SigSpec sel = pmux->getPort(ID::S);
-		SigSpec cnt(State::S0, cntbits);
-
-		for (int i = 0; i < swidth; i++)
-			cnt = module->Add(NEW_ID, cnt, sel[i]);
-
-		SigSpec assert_a = module->Le(NEW_ID, cnt, SigSpec(1, cntbits));
-		SigSpec assert_en;
-
-		if (flag_noinit)
-			assert_en.append(module->LogicNot(NEW_ID, module->Initstate(NEW_ID)));
-
-		if (!flag_always)
-			assert_en.append(get_activation(pmux->getPort(ID::Y)));
-
-		if (GetSize(assert_en) == 0)
-			assert_en = State::S1;
-
-		if (GetSize(assert_en) == 2)
-			assert_en = module->LogicAnd(NEW_ID, assert_en[0], assert_en[1]);
-
-		Cell *assert_cell = module->addAssert(NEW_ID, assert_a, assert_en);
-
-		if (pmux->attributes.count(ID::src) != 0)
-			assert_cell->attributes[ID::src] = pmux->attributes.at(ID::src);
+		log("Adding assert for $add cell %s.%s.\n", log_id(module), log_id(add));
+		return;
 	}
 };
 
