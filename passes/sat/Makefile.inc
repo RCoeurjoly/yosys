@@ -21,3 +21,4 @@ ifeq ($(DISABLE_SPAWN),0)
 OBJS += passes/sat/qbfsat.o
 endif
 OBJS += passes/sat/synthprop.o
+OBJS += passes/sat/assertadd.o
