@@ -40,7 +40,7 @@ struct AssertaddWorker
 	dict<SigSpec, SigBit> sigspec_actsignals;
 	dict<tuple<Cell*, int>, SigBit> muxport_actsignal;
 
-	AssertaddWorker(Module *module, bool flag_noinit, bool flag_always) :
+	AssertaddWorker(Module *module, bool flag_noinit = false, bool flag_always = false) :
 			module(module), sigmap(module), flag_noinit(flag_noinit), flag_always(flag_always)
 	{
 		for (auto wire : module->wires())
@@ -185,52 +185,33 @@ struct AssertaddPass : public Pass {
 	{
 		//   |---v---|---v---|---v---|---v---|---v---|---v---|---v---|---v---|---v---|---v---|
 		log("\n");
-		log("    assertpmux [options] [selection]\n");
+		log("    assertadd [options] [selection]\n");
 		log("\n");
-		log("This command adds asserts to the design that assert that all parallel muxes\n");
-		log("($pmux cells) have a maximum of one of their inputs enable at any time.\n");
-		log("\n");
-		log("    -noinit\n");
-		log("        do not enforce the pmux condition during the init state\n");
-		log("\n");
-		log("    -always\n");
-		log("        usually the $pmux condition is only checked when the $pmux output\n");
-		log("        is used by the mux tree it drives. this option will deactivate this\n");
-		log("        additional constraint and check the $pmux condition always.\n");
+		log("This command adds asserts to the design that assert that all add cells\n");
+		log("($add cells) do not overflow.\n");
 		log("\n");
 	}
 	void execute(std::vector<std::string> args, RTLIL::Design *design) override
 	{
-		bool flag_noinit = false;
-		bool flag_always = false;
-
-		log_header(design, "Executing ASSERTPMUX pass (add asserts for $pmux cells).\n");
+		log_header(design, "Executing ASSERTADD pass (add asserts for $add cells).\n");
 
 		size_t argidx;
 		for (argidx = 1; argidx < args.size(); argidx++)
 		{
-			if (args[argidx] == "-noinit") {
-				flag_noinit = true;
-				continue;
-			}
-			if (args[argidx] == "-always") {
-				flag_always = true;
-				continue;
-			}
-			break;
+		  break;
 		}
 		extra_args(args, argidx, design);
 
 		for (auto module : design->selected_modules())
 		{
-			AssertaddWorker worker(module, flag_noinit, flag_always);
-			vector<Cell*> pmux_cells;
+			AssertaddWorker worker(module);
+			vector<Cell*> add_cells;
 
 			for (auto cell : module->selected_cells())
-				if (cell->type == ID($pmux))
-					pmux_cells.push_back(cell);
+				if (cell->type == ID($add))
+					add_cells.push_back(cell);
 
-			for (auto cell : pmux_cells)
+			for (auto cell : add_cells)
 				worker.run(cell);
 		}
 
