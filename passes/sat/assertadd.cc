@@ -25,170 +25,106 @@ PRIVATE_NAMESPACE_BEGIN
 
 struct AssertaddWorker
 {
-	Module *module;
-	SigMap sigmap;
+  Module *module;
+  SigMap sigmap;
 
-	bool flag_noinit;
-	bool flag_always;
+  bool flag_noinit;
+  bool flag_always;
 
-	// get<0> ... mux cell
-	// get<1> ... mux port index
-	// get<2> ... mux bit index
-	dict<SigBit, pool<tuple<Cell*, int, int>>> sigbit_muxusers;
+  // get<0> ... mux cell
+  // get<1> ... mux port index
+  // get<2> ... mux bit index
+  dict<SigBit, pool<tuple<Cell*, int, int>>> sigbit_muxusers;
 
-	dict<SigBit, SigBit> sigbit_actsignals;
-	dict<SigSpec, SigBit> sigspec_actsignals;
-	dict<tuple<Cell*, int>, SigBit> muxport_actsignal;
+  dict<SigBit, SigBit> sigbit_actsignals;
+  dict<SigSpec, SigBit> sigspec_actsignals;
+  dict<tuple<Cell*, int>, SigBit> muxport_actsignal;
 
-	AssertaddWorker(Module *module, bool flag_noinit = false, bool flag_always = false) :
-			module(module), sigmap(module), flag_noinit(flag_noinit), flag_always(flag_always)
-	{
-	  return;
-		for (auto wire : module->wires())
-		{
-			if (wire->port_output)
-				for (auto bit : sigmap(wire))
-					sigbit_actsignals[bit] = State::S1;
-		}
+  AssertaddWorker(Module *module, bool flag_noinit = false, bool flag_always = false) :
+    module(module), sigmap(module), flag_noinit(flag_noinit), flag_always(flag_always)
+  {
+    return;
+    for (auto wire : module->wires())
+      {
+	if (wire->port_output)
+	  for (auto bit : sigmap(wire))
+	    sigbit_actsignals[bit] = State::S1;
+      }
 
-		for (auto cell : module->cells())
-		{
-			if (cell->type.in(ID($mux), ID($pmux)))
-			{
-				int width = cell->getParam(ID::WIDTH).as_int();
-				int numports = cell->type == ID($mux) ? 2 : cell->getParam(ID::S_WIDTH).as_int() + 1;
+    for (auto cell : module->cells())
+      {
+	if (cell->type.in(ID($mux), ID($pmux)))
+	  {
+	    int width = cell->getParam(ID::WIDTH).as_int();
+	    int numports = cell->type == ID($mux) ? 2 : cell->getParam(ID::S_WIDTH).as_int() + 1;
 
-				SigSpec sig_a = sigmap(cell->getPort(ID::A));
-				SigSpec sig_b = sigmap(cell->getPort(ID::B));
-				SigSpec sig_s = sigmap(cell->getPort(ID::S));
+	    SigSpec sig_a = sigmap(cell->getPort(ID::A));
+	    SigSpec sig_b = sigmap(cell->getPort(ID::B));
+	    SigSpec sig_s = sigmap(cell->getPort(ID::S));
 
-				for (int i = 0; i < numports; i++) {
-					SigSpec bits = i == 0 ? sig_a : sig_b.extract(width*(i-1), width);
-					for (int k = 0; k < width; k++) {
-						tuple<Cell*, int, int> muxuser(cell, i, k);
-						sigbit_muxusers[bits[k]].insert(muxuser);
-					}
-				}
-			}
-			else
-			{
-				for (auto &conn : cell->connections()) {
-					if (!cell->known() || cell->input(conn.first))
-						for (auto bit : sigmap(conn.second))
-							sigbit_actsignals[bit] = State::S1;
-				}
-			}
-		}
-	}
+	    for (int i = 0; i < numports; i++) {
+	      SigSpec bits = i == 0 ? sig_a : sig_b.extract(width*(i-1), width);
+	      for (int k = 0; k < width; k++) {
+		tuple<Cell*, int, int> muxuser(cell, i, k);
+		sigbit_muxusers[bits[k]].insert(muxuser);
+	      }
+	    }
+	  }
+	else
+	  {
+	    for (auto &conn : cell->connections()) {
+	      if (!cell->known() || cell->input(conn.first))
+		for (auto bit : sigmap(conn.second))
+		  sigbit_actsignals[bit] = State::S1;
+	    }
+	  }
+      }
+  }
 
-	SigBit get_bit_activation(SigBit bit)
-	{
-		sigmap.apply(bit);
-
-		if (sigbit_actsignals.count(bit) == 0)
-		{
-			SigSpec output;
-
-			for (auto muxuser : sigbit_muxusers[bit])
-			{
-				Cell *cell = std::get<0>(muxuser);
-				int portidx = std::get<1>(muxuser);
-				int bitidx = std::get<2>(muxuser);
-
-				tuple<Cell*, int> muxport(cell, portidx);
-
-				if (muxport_actsignal.count(muxport) == 0) {
-					if (portidx == 0)
-						muxport_actsignal[muxport] = module->LogicNot(NEW_ID, cell->getPort(ID::S));
-					else
-						muxport_actsignal[muxport] = cell->getPort(ID::S)[portidx-1];
-				}
-
-				output.append(module->LogicAnd(NEW_ID, muxport_actsignal.at(muxport), get_bit_activation(cell->getPort(ID::Y)[bitidx])));
-			}
-
-			output.sort_and_unify();
-
-			if (GetSize(output) == 0)
-				output = State::S0;
-			else if (GetSize(output) > 1)
-				output = module->ReduceOr(NEW_ID, output);
-
-			sigbit_actsignals[bit] = output.as_bit();
-		}
-
-		return sigbit_actsignals.at(bit);
-	}
-
-	SigBit get_activation(SigSpec sig)
-	{
-		sigmap.apply(sig);
-		sig.sort_and_unify();
-
-		if (sigspec_actsignals.count(sig) == 0)
-		{
-			SigSpec output;
-
-			for (auto bit : sig)
-				output.append(get_bit_activation(bit));
-
-			output.sort_and_unify();
-
-			if (GetSize(output) == 0)
-				output = State::S0;
-			else if (GetSize(output) > 1)
-				output = module->ReduceOr(NEW_ID, output);
-
-			sigspec_actsignals[sig] = output.as_bit();
-		}
-
-		return sigspec_actsignals.at(sig);
-	}
-
-	void run(Cell *add)
-	{
-		log("Adding assert for $add cell %s.%s.\n", log_id(module), log_id(add));
-		return;
-	}
+  void run(Cell *add)
+  {
+    log("Adding assert for $add cell %s.%s.\n", log_id(module), log_id(add));
+    return;
+  }
 };
 
 struct AssertaddPass : public Pass {
-	AssertaddPass() : Pass("assertadd", "adds asserts for add cells, checking overflow") { }
-	void help() override
-	{
-		//   |---v---|---v---|---v---|---v---|---v---|---v---|---v---|---v---|---v---|---v---|
-		log("\n");
-		log("    assertadd [options] [selection]\n");
-		log("\n");
-		log("This command adds asserts to the design that assert that all add cells\n");
-		log("($add cells) do not overflow.\n");
-		log("\n");
-	}
-	void execute(std::vector<std::string> args, RTLIL::Design *design) override
-	{
-		log_header(design, "Executing ASSERTADD pass (add asserts for $add cells).\n");
+  AssertaddPass() : Pass("assertadd", "adds asserts for add cells, checking overflow") { }
+  void help() override
+  {
+    //   |---v---|---v---|---v---|---v---|---v---|---v---|---v---|---v---|---v---|---v---|
+    log("\n");
+    log("    assertadd [options] [selection]\n");
+    log("\n");
+    log("This command adds asserts to the design that assert that all add cells\n");
+    log("($add cells) do not overflow.\n");
+    log("\n");
+  }
+  void execute(std::vector<std::string> args, RTLIL::Design *design) override
+  {
+    log_header(design, "Executing ASSERTADD pass (add asserts for $add cells).\n");
 
-		size_t argidx;
-		for (argidx = 1; argidx < args.size(); argidx++)
-		{
-		  break;
-		}
-		extra_args(args, argidx, design);
+    size_t argidx;
+    for (argidx = 1; argidx < args.size(); argidx++)
+      {
+	break;
+      }
+    extra_args(args, argidx, design);
 
-		for (auto module : design->selected_modules())
-		{
-			AssertaddWorker worker(module);
-			vector<Cell*> add_cells;
+    for (auto module : design->selected_modules())
+      {
+	AssertaddWorker worker(module);
+	vector<Cell*> add_cells;
 
-			for (auto cell : module->selected_cells())
-				if (cell->type == ID($add))
-					add_cells.push_back(cell);
+	for (auto cell : module->selected_cells())
+	  if (cell->type == ID($add))
+	    add_cells.push_back(cell);
 
-			for (auto cell : add_cells)
-				worker.run(cell);
-		}
+	for (auto cell : add_cells)
+	  worker.run(cell);
+      }
 
-	}
+  }
 } AssertaddPass;
 
 PRIVATE_NAMESPACE_END
