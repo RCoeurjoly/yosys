@@ -67,10 +67,6 @@ struct AssertaddWorker
   {
     log("Adding assert for $add cell %s.%s.\n", log_id(module), log_id(add));
 
-    const int awidth = add->getParam(ID::A_WIDTH).as_int();
-    const int bwidth = add->getParam(ID::B_WIDTH).as_int();
-    const int ywidth = add->getParam(ID::Y_WIDTH).as_int();
-
     const int asign = add->getParam(ID::A_SIGNED).as_int();
     const int bsign = add->getParam(ID::B_SIGNED).as_int();
 
@@ -80,6 +76,35 @@ struct AssertaddWorker
 
     if (asign == 1 && bsign == 1) {
       log("Signed addition for $add cell %s.%s.\n", log_id(module), log_id(add));
+      
+      const int awidth = add->getParam(ID::A_WIDTH).as_int();
+      const int bwidth = add->getParam(ID::B_WIDTH).as_int();
+      const int ywidth = add->getParam(ID::Y_WIDTH).as_int();
+
+      // Extract the sign bits of a, b, and y
+      SigSpec sign_a = a.extract(awidth - 1);
+      SigSpec sign_b = b.extract(bwidth - 1);
+      SigSpec sign_y = y.extract(ywidth - 1);
+
+      // Check if the signs of a and b are equal
+      SigSpec same_sign_ab = module->Eq(NEW_ID, sign_a, sign_b);
+
+      // Check if the sign of y is different from the sign of a (or b, since they are the same)
+      SigSpec different_sign_ay = module->Ne(NEW_ID, sign_y, sign_a);
+
+      // The assertion condition: same_sign_ab implies not different_sign_ay
+      SigSpec overflow_condition = module->LogicAnd(NEW_ID, same_sign_ab, different_sign_ay);
+      SigSpec assert_a = module->LogicNot(NEW_ID, overflow_condition);
+
+      // Set enable signal to a constant 1
+      SigSpec assert_en = State::S1;
+
+      // Create the assert cell
+      Cell *assert_cell = module->addAssert(NEW_ID, assert_a, assert_en);
+
+      // Copy the source attribute if present
+      if (add->attributes.count(ID::src) != 0)
+	assert_cell->attributes[ID::src] = add->attributes.at(ID::src);
     }
     else {
       log("Unsigned addition for $add cell %s.%s.\n", log_id(module), log_id(add));
