@@ -70,6 +70,7 @@
             git
             gtest
             abc-verifier
+            valgrind
           ];
         };
       }

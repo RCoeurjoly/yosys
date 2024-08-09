@@ -45,9 +45,12 @@ struct AssertaddWorker
   {
     for (auto wire : module->wires())
       {
-	if (wire->port_output)
-	  for (auto bit : sigmap(wire))
-	    sigbit_actsignals[bit] = State::S1;
+	if (!wire->name.isPublic())
+	  continue;
+	if (wire->port_input)
+	  {
+	    addAssume(wire);
+	  }
       }
     
     for (auto cell : module->cells())
@@ -58,11 +61,23 @@ struct AssertaddWorker
 	  }
 	else
 	  {
-	    
 	  }
       }
   }
 
+  void addAssume(Wire *wire) {
+    if (wire->attributes.count(ID(left_bound)) != 0)
+      printf("has left bound\n");
+    if (wire->attributes.count(ID(right_bound)) != 0)
+      printf("has right bound\n");
+    // SigSpec my_sigspec(wire);
+    SigSpec le_than_right_bound = module->Le(NEW_ID, wire, wire->attributes[ID(right_bound)]);
+    SigSpec ge_than_left_bound = module->Ge(NEW_ID, wire, wire->attributes[ID(left_bound)]);
+    SigSpec within_bounds_condition = module->LogicAnd(NEW_ID, ge_than_left_bound, le_than_right_bound);
+    SigSpec assert_en = State::S1;
+    Cell *assume_cell = module->addAssume(NEW_ID, within_bounds_condition, assert_en);
+  }
+  
   void run(Cell *add)
   {
     log("Adding assert for $add cell %s.%s.\n", log_id(module), log_id(add));
@@ -122,6 +137,10 @@ struct AssertaddWorker
       // Copy the source attribute if present
       if (add->attributes.count(ID::src) != 0)
 	assert_cell->attributes[ID::src] = add->attributes.at(ID::src);
+      if (add->attributes.count(ID(left_bound)) != 0)
+	printf("has left bound\n");
+      if (add->attributes.count(ID(right_bound)) != 0)
+	printf("has right bound\n");
     }
    
   }
