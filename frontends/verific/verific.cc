@@ -449,6 +449,12 @@ void VerificImporter::import_attributes(dict<RTLIL::IdString, RTLIL::Const> &att
 		auto type_range = nl->GetTypeRange(obj->Name());
 		if (!type_range)
 			return;
+		if (type_range->IsTypeScalar()) {
+		  const long long left_bound = type_range->GetScalarRangeLeftBound();
+		  const long long right_bound = type_range->GetScalarRangeRightBound();
+		  attributes.emplace(ID(left_bound), left_bound);
+		  attributes.emplace(ID(right_bound), right_bound);
+		}
 		if (!type_range->IsTypeEnum())
 			return;
 #ifdef VERIFIC_VHDL_SUPPORT

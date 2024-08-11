@@ -28,9 +28,6 @@ struct AssertaddWorker
   Module *module;
   SigMap sigmap;
 
-  bool flag_noinit;
-  bool flag_always;
-
   // get<0> ... mux cell
   // get<1> ... mux port index
   // get<2> ... mux bit index
@@ -40,14 +37,19 @@ struct AssertaddWorker
   dict<SigSpec, SigBit> sigspec_actsignals;
   dict<tuple<Cell*, int>, SigBit> muxport_actsignal;
 
-  AssertaddWorker(Module *module, bool flag_noinit = false, bool flag_always = false) :
-    module(module), sigmap(module), flag_noinit(flag_noinit), flag_always(flag_always)
+  AssertaddWorker(Module *module) :
+    module(module), sigmap(module)
   {
+    vector<Wire*> input_wires;
+    vector<Wire*> non_input_public_wires;
     for (auto wire : module->wires())
       {
-	if (wire->port_output)
-	  for (auto bit : sigmap(wire))
-	    sigbit_actsignals[bit] = State::S1;
+	if (!wire->name.isPublic())
+	  continue;
+	if (wire->port_input)
+	  input_wires.push_back(wire);
+	else
+	  non_input_public_wires.push_back(wire);
       }
     
     for (auto cell : module->cells())
@@ -58,11 +60,31 @@ struct AssertaddWorker
 	  }
 	else
 	  {
-	    
 	  }
       }
+    for (auto wire: input_wires)
+      addBoundCheck(wire, &RTLIL::Module::addAssume);
+    for (auto wire: non_input_public_wires)
+      addBoundCheck(wire, &RTLIL::Module::addAssert);
   }
 
+  typedef RTLIL::Cell* (RTLIL::Module::*AddFunc)(RTLIL::IdString, const RTLIL::SigSpec&, const RTLIL::SigSpec&, const std::string&);
+
+  void addBoundCheck(Wire *wire, AddFunc addFunc) {
+    // We need both bounds to insert the property
+    if (wire->attributes.count(ID(left_bound)) == 0 || wire->attributes.count(ID(right_bound)) == 0)
+      return;
+
+    SigSpec le_than_right_bound = module->Le(NEW_ID, wire, wire->attributes[ID(right_bound)]);
+    SigSpec ge_than_left_bound = module->Ge(NEW_ID, wire, wire->attributes[ID(left_bound)]);
+    SigSpec within_bounds_condition = module->LogicAnd(NEW_ID, ge_than_left_bound, le_than_right_bound);
+    SigSpec assert_en = State::S1;
+
+    Cell *cell = (module->*addFunc)(NEW_ID, within_bounds_condition, assert_en, "");
+    if (wire->attributes.count(ID::src) != 0)
+      cell->attributes[ID::src] = wire->attributes.at(ID::src);
+  }
+  
   void run(Cell *add)
   {
     log("Adding assert for $add cell %s.%s.\n", log_id(module), log_id(add));
@@ -122,6 +144,10 @@ struct AssertaddWorker
       // Copy the source attribute if present
       if (add->attributes.count(ID::src) != 0)
 	assert_cell->attributes[ID::src] = add->attributes.at(ID::src);
+      if (add->attributes.count(ID(left_bound)) != 0)
+	printf("has left bound\n");
+      if (add->attributes.count(ID(right_bound)) != 0)
+	printf("has right bound\n");
     }
    
   }
