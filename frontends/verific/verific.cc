@@ -448,12 +448,31 @@ void VerificImporter::import_attributes(dict<RTLIL::IdString, RTLIL::Const> &att
 	if (nl) {
 		auto type_range = nl->GetTypeRange(obj->Name());
 		if (!type_range)
-			return;
+		    return;
 		if (type_range->IsTypeScalar()) {
 		  const long long left_bound = type_range->GetScalarRangeLeftBound();
 		  const long long right_bound = type_range->GetScalarRangeRightBound();
-		  attributes.emplace(ID(left_bound), left_bound);
-		  attributes.emplace(ID(right_bound), right_bound);
+		  if (left_bound >= INT_MIN && left_bound <= INT_MAX && right_bound >= INT_MIN && right_bound <= INT_MAX) {
+		    attributes.emplace(ID(left_bound), RTLIL::Const(static_cast<int>(left_bound)));
+		    attributes.emplace(ID(right_bound), RTLIL::Const(static_cast<int>(right_bound)));
+		  } else {
+		    // Convert long long to binary string and then to vector<bool>
+		    const std::bitset<sizeof(long long) * CHAR_BIT> binary_left(left_bound);
+		    std::vector<bool> bits_left(binary_left.size());
+		    for (size_t i = 0; i < binary_left.size(); ++i) {
+		      bits_left[i] = binary_left[i];
+		    }
+		    
+		    const std::bitset<sizeof(long long) * CHAR_BIT> binary_right(right_bound);
+		    std::vector<bool> bits_right(binary_right.size());
+		    for (size_t i = 0; i < binary_right.size(); ++i) {
+		      bits_right[i] = binary_right[i];
+		    }
+		    
+		    // Store as RTLIL::Const using the vector<bool> constructor
+		    attributes.emplace(ID(left_bound), RTLIL::Const(bits_left));
+		    attributes.emplace(ID(right_bound), RTLIL::Const(bits_right));
+		  }
 		}
 		if (!type_range->IsTypeEnum())
 			return;

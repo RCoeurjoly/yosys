@@ -74,9 +74,15 @@ struct AssertaddWorker
     // We need both bounds to insert the property
     if (wire->attributes.count(ID(left_bound)) == 0 || wire->attributes.count(ID(right_bound)) == 0)
       return;
-
-    SigSpec le_than_right_bound = module->Le(NEW_ID, wire, wire->attributes[ID(right_bound)]);
-    SigSpec ge_than_left_bound = module->Ge(NEW_ID, wire, wire->attributes[ID(left_bound)]);
+    const RTLIL::Const left_bound = wire->attributes[ID(left_bound)];
+    const RTLIL::Const right_bound = wire->attributes[ID(right_bound)];
+    bool is_signed = false;
+    if (left_bound.as_int() < 0 || right_bound.as_int() < 0)
+      {
+	is_signed = true;
+      }
+    SigSpec ge_than_left_bound = module->Ge(NEW_ID, wire, left_bound, is_signed);
+    SigSpec le_than_right_bound = module->Le(NEW_ID, wire, right_bound, is_signed);
     SigSpec within_bounds_condition = module->LogicAnd(NEW_ID, ge_than_left_bound, le_than_right_bound);
     SigSpec assert_en = State::S1;
 
@@ -144,10 +150,6 @@ struct AssertaddWorker
       // Copy the source attribute if present
       if (add->attributes.count(ID::src) != 0)
 	assert_cell->attributes[ID::src] = add->attributes.at(ID::src);
-      if (add->attributes.count(ID(left_bound)) != 0)
-	printf("has left bound\n");
-      if (add->attributes.count(ID(right_bound)) != 0)
-	printf("has right bound\n");
     }
    
   }
@@ -186,8 +188,9 @@ struct AssertaddPass : public Pass {
 	  if (cell->type == ID($add))
 	    add_cells.push_back(cell);
 
-	for (auto cell : add_cells)
-	  worker.run(cell);
+	for (auto cell : add_cells) {
+	  // worker.run(cell);
+	}
       }
 
   }
