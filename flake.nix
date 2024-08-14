@@ -70,6 +70,8 @@
             git
             gtest
             abc-verifier
+            valgrind
+            gtkwave
           ];
         };
       }
