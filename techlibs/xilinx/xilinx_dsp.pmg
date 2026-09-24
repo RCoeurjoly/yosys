@@ -388,7 +388,7 @@ endcode
 //      to implement this function
 match overflow
 	if ffP
-	if param(dsp, \USE_PATTERN_DETECT).decode_string() == "NO_PATDET"
+	if param(dsp, \USE_PATTERN_DETECT, Const("NO_PATDET")).decode_string() == "NO_PATDET"
 	select overflow->type.in($ge)
 	select GetSize(port(overflow, \Y)) <= 48
 	select port(overflow, \B).is_fully_const()

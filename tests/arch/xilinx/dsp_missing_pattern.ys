@@ -1,0 +1,26 @@
+read_verilog <<EOT
+module top(
+  input clk,
+  input signed [24:0] a,
+  input signed [17:0] b,
+  output reg signed [42:0] p,
+  output overflow
+);
+  reg signed [42:0] m;
+
+  always @(posedge clk)
+    m <= a * b;
+
+  always @(posedge clk)
+    p <= m;
+
+  assign overflow = p >= 43'sh000_4000_0000;
+endmodule
+EOT
+
+synth_xilinx -family xc7 -top top -noiopad
+
+cd top
+select -assert-count 1 t:DSP48E1
+select -assert-count 1 t:DSP48E1 r:USE_PATTERN_DETECT=PATDET %i
+select -assert-none t:$ge
